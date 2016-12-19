@@ -4,10 +4,10 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.text.format.Time;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -29,9 +29,6 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -47,6 +44,7 @@ public class ForecastFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+        updateWeather();
     }
 
     @Override
@@ -58,21 +56,48 @@ public class ForecastFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
 
-        if(item.getItemId() == R.id.action_refresh) {
+        if (item.getItemId() == R.id.action_refresh) {
 
-            new FetchWeatherTask().execute("94043");
+            updateWeather();
+
+            //new FetchWeatherTask().execute("94043");
 
             return true;
         }
+        else if(item.getItemId() == R.id.action_preferred_location) {
+            String pref_location_key = getString(R.string.pref_location_key);
+            String pref_location_default_value = getString(R.string.pref_location_default);
+            String pref_location = PreferenceManager.getDefaultSharedPreferences(getContext()).getString(pref_location_key, pref_location_default_value);
+            String uris = "geo:0,0?q=" + pref_location;
+
+            Uri uri = Uri.parse(uris);
+
+            showMap(uri);
+        }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showMap(Uri geoLocation) {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(geoLocation);
+        if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
+            startActivity(intent);
+        }
+    }
+
+    private void updateWeather() {
+        String pref_location_key = getString(R.string.pref_location_key);
+        String pref_location_default_value = getString(R.string.pref_location_default);
+        String pref_location = PreferenceManager.getDefaultSharedPreferences(getContext()).getString(pref_location_key, pref_location_default_value);
+        new FetchWeatherTask().execute(pref_location);
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
-        String[] data = {
+       /* String[] data = {
                 "Mon 6/23 - Sunny - 31/17",
                 "Tue 6/24 - Foggy - 21/8",
                 "Wed 6/25 - Cloudy - 22/17",
@@ -82,9 +107,10 @@ public class ForecastFragment extends Fragment {
                 "Sun 6/29 - Sunny - 20/7"
         };
 
-        List<String> weekForecast = new ArrayList<String>(Arrays.asList(data));
+        List<String> weekForecast = new ArrayList<String>(Arrays.asList(data));*/
 
-        mForecastAdapter = new ArrayAdapter<String>(getActivity(), R.layout.list_item_forecast, R.id.list_item_forecast_textview, weekForecast);
+        //mForecastAdapter = new ArrayAdapter<String>(getActivity(), R.layout.list_item_forecast, R.id.list_item_forecast_textview, weekForecast);
+        mForecastAdapter = new ArrayAdapter<String>(getActivity(), R.layout.list_item_forecast, R.id.list_item_forecast_textview);
 
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
@@ -96,12 +122,12 @@ public class ForecastFragment extends Fragment {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
-                String item = (String)parent.getItemAtPosition(position);
+                String item = (String) parent.getItemAtPosition(position);
 
                 //Toast.makeText(getContext(), item, Toast.LENGTH_SHORT).show();
 
                 Intent detailsIntent = new Intent(getActivity(), DetailActivity.class);
-                detailsIntent.putExtra(Intent.EXTRA_TEXT , item);
+                detailsIntent.putExtra(Intent.EXTRA_TEXT, item);
                 startActivity(detailsIntent);
 
 
@@ -129,12 +155,24 @@ public class ForecastFragment extends Fragment {
         /**
          * Prepare the weather high/lows for presentation.
          */
-        private String formatHighLows(double high, double low) {
+        private String formatHighLows(double high, double low, String temperatureUnit) {
             // For presentation, assume the user doesn't care about tenths of a degree.
             long roundedHigh = Math.round(high);
             long roundedLow = Math.round(low);
+            String unitDisplay = "°C";
 
-            String highLowStr = roundedHigh + "/" + roundedLow;
+            // 1 - metric (C)
+            // 2 - imperial (F)
+            // Fahrenheit=(C*1.8)+32. Celsius=(F-32)/1.8
+
+            if (temperatureUnit.equalsIgnoreCase("2")) {
+                roundedHigh = Math.round((high * 1.8) + 32);
+                roundedLow = Math.round((low * 1.8) + 32);
+                unitDisplay = "°F";
+            }
+
+
+            String highLowStr = roundedHigh + "/" + roundedLow + ' ' + unitDisplay;
             return highLowStr;
         }
 
@@ -176,6 +214,11 @@ public class ForecastFragment extends Fragment {
             // now we work exclusively in UTC
             dayTime = new Time();
 
+            String pref_temp_unit_key = getString(R.string.pref_temperature_unit_key);
+            String pref_temp_unit_default_value = "1";
+            String pref_temp_unit = PreferenceManager.getDefaultSharedPreferences(getContext()).getString(pref_temp_unit_key, pref_temp_unit_default_value);
+
+
             String[] resultStrs = new String[numDays];
             for (int i = 0; i < weatherArray.length(); i++) {
                 // For now, using the format "Day, description, hi/low"
@@ -204,12 +247,12 @@ public class ForecastFragment extends Fragment {
                 double high = temperatureObject.getDouble(OWM_MAX);
                 double low = temperatureObject.getDouble(OWM_MIN);
 
-                highAndLow = formatHighLows(high, low);
+                highAndLow = formatHighLows(high, low, pref_temp_unit);
                 resultStrs[i] = day + " - " + description + " - " + highAndLow;
             }
 
             for (String s : resultStrs) {
-                Log.v(LOG_TAG, "Forecast entry: " + s);
+                //Log.v(LOG_TAG, "Forecast entry: " + s);
             }
             return resultStrs;
 
@@ -253,7 +296,7 @@ public class ForecastFragment extends Fragment {
 
                 final String urlString = builtUri.toString();
 
-                Log.i(LOG_TAG, "url = " + urlString);
+                //Log.i(LOG_TAG, "url = " + urlString);
 
                 URL url = new URL(urlString);
 
@@ -285,10 +328,10 @@ public class ForecastFragment extends Fragment {
                 }
                 forecastJsonStr = buffer.toString();
 
-                Log.i(LOG_TAG, "Returned JSON: " + forecastJsonStr);
+                //Log.i(LOG_TAG, "Returned JSON: " + forecastJsonStr);
 
             } catch (IOException e) {
-                Log.e(LOG_TAG, "Error ", e);
+                //Log.e(LOG_TAG, "Error ", e);
                 // If the code didn't successfully get the weather data, there's no point in attempting
                 // to parse it.
                 forecastJsonStr = null;
@@ -300,7 +343,7 @@ public class ForecastFragment extends Fragment {
                     try {
                         reader.close();
                     } catch (final IOException e) {
-                        Log.e(LOG_TAG, "Error closing stream", e);
+                        //Log.e(LOG_TAG, "Error closing stream", e);
                     }
                 }
             }
@@ -310,7 +353,7 @@ public class ForecastFragment extends Fragment {
             try {
                 return getWeatherDataFromJson(forecastJsonStr, numDays);
             } catch (JSONException e) {
-                Log.e(LOG_TAG, e.getMessage(), e);
+                //Log.e(LOG_TAG, e.getMessage(), e);
                 e.printStackTrace();
             }
 
