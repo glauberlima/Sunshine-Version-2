@@ -1,24 +1,56 @@
 package com.example.android.sunshine.app;
 
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
 
 public class MainActivity extends ActionBarActivity {
 
+    private String CLASS_TAG = MainActivity.class.getSimpleName();
+
+    @Override
+    protected void onPause() {
+        Log.i(CLASS_TAG, "onPause");
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        Log.i(CLASS_TAG, "onResume");
+        super.onResume();
+    }
+
+    @Override
+    protected void onStop() { // ultimo evento com certeza de ser chamado em alternancia de app.
+        super.onStop();
+    }
+
+    @Override
+    protected void onStart() {
+        Log.i(CLASS_TAG, "onStart");
+        super.onStart();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.i(CLASS_TAG, "onCreate");
         setContentView(R.layout.activity_main);
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
                     .add(R.id.container, new ForecastFragment())
                     .commit();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        Log.i(CLASS_TAG, "onDestroy");
+        super.onDestroy();
     }
 
     @Override
